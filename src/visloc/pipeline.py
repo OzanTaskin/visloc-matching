@@ -6,10 +6,12 @@ swapped in without touching the map), and every step is cached on disk.
 """
 
 import pickle
+import sqlite3
 import time
 from pathlib import Path
 
 import cv2
+import pycolmap
 from hloc import (extract_features, localize_sfm, match_features,
                   pairs_from_covisibility, pairs_from_retrieval, triangulation)
 from hloc.pipelines.Cambridge.utils import create_query_list_with_intrinsics, scale_sfm_images
@@ -25,6 +27,7 @@ def read_list(path: Path) -> list:
 def prepare_scene(p: dict, max_queries: int = 0) -> list:
     """Shared, method-independent inputs. Returns the query names used."""
     p["out"].mkdir(parents=True, exist_ok=True)
+    p["maps"].mkdir(parents=True, exist_ok=True)
     queries = read_list(p["list_query"])
     if max_queries:
         queries = queries[:max_queries]
@@ -58,7 +61,7 @@ def condition_dir(p: dict, condition: str, queries: list) -> Path:
 
 def build_map(p: dict, method: Method) -> dict:
     """Database features + triangulated 3D map for one method (cached)."""
-    out = p["out"] / method.name
+    out = p["maps"] / method.name
     paths = {
         "db_features": out / "feats_db.h5",
         "db_matches": out / "matches_db.h5",
@@ -69,10 +72,40 @@ def build_map(p: dict, method: Method) -> dict:
     if not paths["db_matches"].exists():
         match_features.main(method.matcher, p["sfm_pairs"], features=paths["db_features"],
                             matches=paths["db_matches"])
-    if not (paths["sfm"] / "images.bin").exists():
-        triangulation.main(paths["sfm"], p["ref_sfm_scaled"], p["images"], p["sfm_pairs"],
-                           paths["db_features"], paths["db_matches"])
+    if not (paths["sfm"] / "points3D.bin").exists() or _num_points(paths["sfm"]) == 0:
+        triangulate(paths["sfm"], p["ref_sfm_scaled"], p["images"], p["sfm_pairs"],
+                    paths["db_features"], paths["db_matches"])
     return paths
+
+
+def _num_points(sfm_dir: Path) -> int:
+    return pycolmap.Reconstruction(sfm_dir).num_points3D()
+
+
+def triangulate(sfm_dir, reference_model, image_dir, pairs, features, matches):
+    """hloc's `triangulation.main`, adapted to pycolmap >= 4.
+
+    hloc stores geometrically verified pairs with configuration UNDEFINED, which
+    pycolmap 4 skips when building the correspondence graph, giving an empty map.
+    The pairs are verified against the known (ground-truth) relative poses, so we
+    mark them as CALIBRATED before triangulating.
+    """
+    sfm_dir.mkdir(parents=True, exist_ok=True)
+    database = sfm_dir / "database.db"
+    database.unlink(missing_ok=True)
+    reference = pycolmap.Reconstruction(reference_model)
+    image_ids = triangulation.create_db_from_model(reference, database)
+    with pycolmap.Database.open(database) as db:
+        triangulation.import_features(image_ids, db, features)
+        triangulation.import_matches(image_ids, db, pairs, matches)
+        triangulation.geometric_verification(image_ids, reference, db, features, pairs, matches)
+    with sqlite3.connect(database) as con:
+        con.execute("UPDATE two_view_geometries SET config = ? WHERE rows > 0",
+                    (int(pycolmap.TwoViewGeometryConfiguration.CALIBRATED),))
+    rec = triangulation.run_triangulation(sfm_dir, database, image_dir, reference)
+    print(f"Triangulated map: {rec.num_points3D()} points, "
+          f"mean reprojection error {rec.compute_mean_reprojection_error():.2f} px")
+    return rec
 
 
 def localize(p: dict, method: Method, map_paths: dict, condition: str, queries: list) -> dict:

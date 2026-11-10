@@ -8,6 +8,7 @@ setup:  ## create the virtual environment and install hloc + dependencies
 	$(PY) -m pip install -r requirements.txt
 	git clone --recursive https://github.com/cvg/Hierarchical-Localization.git third_party/hloc || true
 	$(PY) -m pip install -e third_party/hloc
+	bash scripts/fix_macos_openmp.sh
 
 data:  ## download ShopFacade (~1.4 GB) and the reference COLMAP models
 	PATH=.venv/bin:$$PATH bash scripts/download_cambridge.sh

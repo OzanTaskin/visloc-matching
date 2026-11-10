@@ -66,12 +66,12 @@ def main() -> None:
     shown = [m for m in ("sift-nn", "superpoint-lightglue") if m in args.methods]
     if shown:
         visualize.plot_topdown(
-            p["out"] / shown[-1] / "sfm", p["gt"] / "images.txt",
+            p["maps"] / shown[-1] / "sfm", p["gt"] / "images.txt",
             {METHODS[m].label: runs[(m, hardest)]["poses"] for m in shown}, queries,
             figures / f"topdown_{hardest}.png",
             failed={METHODS[m].label: runs[(m, hardest)]["failed"] for m in shown},
             title=f"Ground truth (green) to estimate (red), condition: {hardest}")
-        visualize.export_3d(p["out"] / shown[-1] / "sfm", p["out"] / "map_3d.html")
+        visualize.export_3d(p["maps"] / shown[-1] / "sfm", p["out"] / "map_3d.html")
     print(f"Results written to {results_dir}")
 
 

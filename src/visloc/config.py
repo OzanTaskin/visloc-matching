@@ -106,15 +106,16 @@ CONDITIONS = {
 def scene_paths(scene: str, tag: str = "") -> dict:
     """All input/output locations for one scene. `tag` separates e.g. smoke runs."""
     ref = REF_MODELS_DIR / scene
-    out = OUTPUTS_DIR / f"{scene}{tag}"
+    base = OUTPUTS_DIR / scene  # query-independent: maps and database features
     return {
         "images": DATASET_DIR / scene,
         "ref_sfm": ref / "model_train",  # reference SIFT model (database poses)
         "gt": ref / "empty_all",  # ground-truth poses of all images (text model)
         "list_query": ref / "list_query.txt",
         "list_db": ref / "list_db.txt",
-        "out": out,
-        "ref_sfm_scaled": out / "sfm_sift_scaled",
-        "sfm_pairs": out / f"pairs-db-covis{NUM_COVIS}.txt",
-        "retrieval_db": out / "netvlad_db.h5",
+        "maps": base / "maps",
+        "out": base / f"queries{tag}",  # everything that depends on the query set
+        "ref_sfm_scaled": base / "sfm_sift_scaled",
+        "sfm_pairs": base / f"pairs-db-covis{NUM_COVIS}.txt",
+        "retrieval_db": base / "netvlad_db.h5",
     }
