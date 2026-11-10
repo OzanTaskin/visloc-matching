@@ -1,0 +1,11 @@
+# hloc (Hierarchical-Localization) is installed from GitHub by `make setup`;
+# it pulls pycolmap, kornia, h5py and LightGlue.
+torch
+torchvision
+opencv-python
+numpy
+pandas
+matplotlib
+plotly
+gdown
+pytest
