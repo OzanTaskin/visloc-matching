@@ -1,0 +1,104 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{lmodern}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{textcomp}
+\usepackage[hidelinks]{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\graphicspath{{../results/figures/}}
+
+\title{Where Was This Photo Taken?\\[2pt]
+\large Classical vs.\ Learned Feature Matching for Visual Localization under Image Degradations}
+\author{Ozan Taskin\\\small Sorbonne Université, M1 Computer Science (IMA)}
+\date{November 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+%ABSTRACT%
+\end{abstract}
+
+\section{Introduction}
+Visual localization estimates the 6-DoF pose of a camera from a single image, given a
+3D map of the scene. It is a core building block of robot navigation, augmented reality
+and autonomous driving. Structure-based pipelines establish 2D--3D correspondences between
+the query image and the map, and then solve a Perspective-n-Point (PnP) problem inside
+RANSAC~\cite{sarlin2019coarse}. The quality of those correspondences, and hence of the pose,
+depends on the local features and the matcher.
+
+Learned features and matchers, such as SuperPoint~\cite{detone2018superpoint},
+ALIKED~\cite{zhao2023aliked} and LightGlue~\cite{lindenberger2023lightglue}, are reported to
+outperform handcrafted SIFT~\cite{lowe2004sift} on challenging benchmarks. This project asks a
+narrower, practical question: \emph{on a small outdoor scene, how much do learned matchers gain
+over SIFT, and does the gap widen when query images are degraded (low light, blur, low
+resolution)?} The answer matters for robots and phones whose cameras rarely see the scene in
+the conditions under which the map was built.
+
+\paragraph{Contributions.}
+(i) A compact, reproducible benchmark built on hloc~\cite{sarlin2019coarse} and
+COLMAP~\cite{schoenberger2016sfm}; (ii) a comparison of three feature/matcher pairs under four
+controlled query conditions with identical maps, retrieval and solver; (iii) an analysis of
+when and why localization fails.
+
+\section{Method}
+\paragraph{Map building.}
+For each method we extract local features on all database images and match each image to
+its 10 most co-visible neighbours in the reference model. Matches are verified with the
+known relative poses (epipolar check) and triangulated with the ground-truth camera poses,
+as in hloc's Cambridge pipeline. Each method therefore gets its own 3D map, built from its
+own features, while camera poses stay fixed.
+
+\paragraph{Localization.}
+For each query, NetVLAD~\cite{arandjelovic2016netvlad} retrieves the 10 most similar database
+images. Query keypoints are matched to these images; the matched database keypoints carry 3D
+points, giving 2D--3D correspondences. The pose is estimated with PnP inside LO-RANSAC
+(12\,px threshold) followed by non-linear refinement, using the known query intrinsics.
+
+\paragraph{Compared methods.}
+\begin{itemize}\setlength\itemsep{0pt}
+  \item \textbf{SIFT + NN ratio}: DoG keypoints with RootSIFT descriptors (COLMAP), mutual
+        nearest neighbours with Lowe's ratio test (0.8). The classical baseline.
+  \item \textbf{SuperPoint + LightGlue}: learned detector/descriptor and learned matcher with
+        adaptive depth~\cite{detone2018superpoint,lindenberger2023lightglue}.
+  \item \textbf{ALIKED + LightGlue}: a more recent, lightweight learned feature with the same
+        matcher~\cite{zhao2023aliked}.
+\end{itemize}
+All methods use at most 2048 keypoints per image and images resized to 1024\,px.
+
+\paragraph{Query degradations.}
+Only query images are modified; database images, maps and parameters are unchanged
+(Fig.~\ref{fig:conditions}).
+\emph{Dark}: gamma 1.8, exposure gain 0.35 and Gaussian sensor noise ($\sigma=4$ grey levels).
+\emph{Blur}: Gaussian blur with $\sigma=3$\,px.
+\emph{Low-res}: downsampling by 4 and upsampling back.
+Degradations are deterministic (fixed per-image seeds).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{conditions.png}
+  \caption{One query image under the four conditions.}
+  \label{fig:conditions}
+\end{figure}
+
+\section{Experimental Setup}
+\paragraph{Data.} We use the ShopFacade scene of Cambridge Landmarks~\cite{kendall2015posenet}:
+231 database and 103 query images of a shop front, with reference poses from a COLMAP
+reconstruction distributed with hloc.
+
+\paragraph{Metrics.} Position error is the distance between estimated and ground-truth camera
+centres; rotation error is the angle of the relative rotation. We report median errors and the
+percentage of queries within (25\,cm, 2\textdegree), (50\,cm, 5\textdegree) and
+(5\,m, 10\textdegree). Queries where RANSAC finds no pose count as failures (infinite error).
+Runtime is the wall-clock time per query for feature extraction, matching and pose estimation,
+on a laptop CPU (Apple M2, 8\,GB RAM, no GPU).
+
+%RESULTS%
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+\end{document}

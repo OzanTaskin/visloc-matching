@@ -45,7 +45,10 @@ METHODS = {
             label="SIFT + NN ratio",
             features={
                 "output": "feats-sift",
-                "model": {"name": "dog", "max_keypoints": MAX_KEYPOINTS},
+                # Cap keypoints inside COLMAP's SIFT (hloc's own cap sorts by
+                # placeholder scores and fails on images with fewer keypoints).
+                "model": {"name": "dog", "options": {"first_octave": 0, "peak_threshold": 0.01,
+                                                     "max_num_features": MAX_KEYPOINTS}},
                 "preprocessing": {"grayscale": True, "resize_max": RESIZE_MAX},
             },
             matcher={
